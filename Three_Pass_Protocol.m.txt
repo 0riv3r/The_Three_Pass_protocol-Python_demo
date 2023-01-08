@@ -1,0 +1,218 @@
+% 3.6.1 Three-Pass Protocol
+
+% Introduction to Cryptography with Coding Theory, THIRD EDITION
+% ch-3.6.1
+% https://en.wikipedia.org/wiki/Three-pass_protocol
+
+% Required MATLAB toolboxes
+% -------------------------
+% statistics and machine learning - for randi function
+% Symbolic Math Toolbox - for sym and powermod functions
+
+
+% Set the output format to the long fixed-decimal format.
+% change the number display from scientific notation to the full number in
+% digits.
+% https://www.mathworks.com/help/matlab/ref/format.html
+% longG: Long, fixed-decimal format or scientific notation, whichever is more compact, with a total of 15 digits for double values, and 7 digits for single values.
+format longG
+
+% 1. Alice publishes public key: p
+% 2. Alice selects a random number a: {a: gcd(a,p-1)=1} and the inverse of a(mod p-1): a' 
+% 3. Bob selects a random number b: {b: gcd(b,p-1)=1} and the inverse of b(mod p-1): b' 
+% 
+% 4. Alice sends k1= ka^a(mod p) to Bob.
+% 5. Bob sends k2= k1^b(mod p) to Alice.
+% 6. Alice sends k3= k2^(a')(mod p) to Bob.
+% 7. Bob computes kb= k3^(b')(mod p).
+% 
+% 8. assert(kb == ka);
+% 
+
+% Choose a bits length for the numbers
+% This code runs forever when over 2^54 bits.
+% currently endless loop in: "find 2 random numbers r: {r: gcd(r,p-1)=1}"
+bit_length = 54;
+
+% 1) Find a 20 bit prime at:
+%   https://primes.utm.edu/lists/2small/0bit.html
+%   2^20-3 = 1048573
+%   factor(1048573) = 1048573
+% p = sym(2)^54-33;
+
+% random-number-of-n-bits-length
+% https://www.mathworks.com/matlabcentral/answers/417783-how-to-generate-a-random-number-of-n-bits-length
+% rp = primes( randi([1, 2^(bit_length-1)]) + 2^(bit_length-1) - 1 );
+% p = sym( rp(end) );
+
+% https://www.mathworks.com/help/matlab/ref/rand.html
+% https://www.mathworks.com/matlabcentral/answers/417783-how-to-generate-a-random-number-of-n-bits-length
+% In general, you can generate N random numbers in the interval (a,b) with the formula r = a + (b-a).*rand(N,1).
+% Generate a 1-by-1 vector of uniformly distributed numbers in the interval (2^bit_length-2,(2^bit_length-2)-1).
+
+% rpc = round( sym(2)^(bit_length-1) + (sym(2)^(bit_length-1) + (sym(2)^(bit_length-1) - 1))*rand(1,1) );
+% rpc = double(rpc);
+% disp("rpc= "+ rpc);
+% disp("class(rpc)= " + class(rpc))
+% rp = primes(double(rpc));
+% p = sym( rp(end) );
+
+% Previous prime number
+% https://www.mathworks.com/help/symbolic/prevprime.html
+% prevprime(10^sym(18))
+p = prevprime(2^sym(bit_length));
+disp("Prime= " + string(p))
+
+% 2) find random a, b that are coprimes to p
+%   these are the private keys that each one will use for their shared key
+%   generation
+%   a- Alise's private key, b- Bob's private key
+%   https://www.mathworks.com/help/matlab/math/random-integers.html
+%   r - an array of 2 random numbers
+%   range: rmax= 268435398 rmin= 100000001
+%   amount of numbers: n = 2
+
+% n = 1; % number of numbers in the result array
+% rmax= p-2;
+% rmin= 100001;
+% rng = [rmin rmax];
+% r = randi([min max],1,n);
+
+% preallocate array memory size
+% https://www.mathworks.com/help/matlab/matlab_prog/preallocating-arrays.html
+r = zeros(1,2);
+
+% find 2 random numbers r: {r: gcd(r,p-1)=1}
+for i=1:2
+    r(i) = p-1;
+    while( gcd(sym([r(i),p-1]))~=1 )
+        % r(i) = randi(rng,1,n);
+        % https://www.mathworks.com/matlabcentral/answers/417783-how-to-generate-a-random-number-of-n-bits-length
+        % r has to be smaller than p
+        % r(i) = randi([1, 2^(bit_length-2)]) + 2^(bit_length-2) - 1;
+
+        % https://www.mathworks.com/help/matlab/ref/rand.html
+        % https://www.mathworks.com/matlabcentral/answers/417783-how-to-generate-a-random-number-of-n-bits-length
+        % In general, you can generate N random numbers in the interval (a,b) with the formula r = a + (b-a).*rand(N,1).
+        % Generate a 1-by-1 vector of uniformly distributed numbers in the interval (2^bit_length-2,(2^bit_length-2)-1).
+        r(i) = round( sym(2)^(bit_length-2) + (sym(2)^(bit_length-2) + (sym(2)^(bit_length-2) - 1))*rand(1,1) );
+        % disp("class r(i): " + class(r(i)));
+        % disp("r("+i+")= " + r(i));
+
+    end
+end
+
+% for i=1:2
+%     r(i) = p-1;
+%     % 'iscoprime' requires Phased Array System Toolbox.
+%     while( iscoprime([double(r(i)) double(p-1)])~=1 )
+%         r(i) = round( sym(2)^(bit_length-2) + (sym(2)^(bit_length-2) + (sym(2)^(bit_length-2) - 1))*rand(1,1) );
+%     end
+% end
+
+% Display the two private keys
+% disp("r(1)= " + r(1));
+% disp("r(2)= " + r(2));
+
+% check that the chosen random numbers in the r array are in the required range
+% assert( all(r >= rmin & r <= rmax) )
+% check that the chosen random numbers have gcd of 1 with p-1
+assert( all(gcd(r,p-1)== 1), "private key is not coprime to p-1!" )
+
+% 3) find the inverse numbers of r: r(mod p-1): r'
+
+% used online calculators
+% find the Modular Multiplicative Inverse numbers:
+% https://www.dcode.fr/modular-inverse
+
+
+% find an inverse using MatLab:
+% https://www.mathworks.com/matlabcentral/answers/81859-how-to-write-matlab-code-for-modular-multiplicative-inverse-in-cryptography
+% [D,I] = gcd(r,p-1)
+% D - the gcd, which should be 1
+% I - the inverse of r
+% gcd(r*I,p-1) = 1
+% r*I(mod p-1) = 1(mod p-1)
+% mod(r*I,p-1)
+
+% Example:
+% p= 1048573
+% (p-1)= 1048572
+% r(1)= 1003685
+% [D,I] = gcd(r,p-1)
+% [G,D] = gcd(1003685,1048572)
+% G= 1, D= -283687
+% gcd(r*I,p-1) = 1
+% gcd(1003685*(-283687),1048572) = 1
+% Verify modulu:
+% r*I(mod p-1) = 1(mod p-1)
+% mod(1003685*(-283687),1048572) = 1(mod 1048572)
+
+% The inverse numbers
+% Each one calculates the inverse-number of his/her private key
+% inv_r(1)- the inverse number of Alise's private key
+% inv_r(2)- the inverse number of Bob's private key
+inv_r = zeros(1,2);
+[D,inv_r(1)] = gcd(r(1),p-1);
+[D,inv_r(2)] = gcd(r(2),p-1);
+% disp("inv_r(1)= " + inv_r(1));
+% disp("inv_r(2)= " + inv_r(2));
+
+% check that the inverse-numbers x private-keys, are coprime to p-1
+assert( mod(sym(r(1))*inv_r(1), p-1) == 1, "private key-1 x inverse, is not coprime to p-1!" )
+assert( mod(sym(r(2))*inv_r(2), p-1) == 1, "private key-2 x inverse, is not coprime to p-1!" )
+
+
+% 4) Alise chooses a shared-key ka
+% ka will eventually be shared with Bob
+% n = 1;
+% kmax= 9999;
+% kmin= 1001;
+% krng = [rmin rmax];
+% ka = sym(randi(rng,1,n));
+% https://www.mathworks.com/matlabcentral/answers/417783-how-to-generate-a-random-number-of-n-bits-length
+% ka has to be smaller than p
+% ka = randi([1, 2^(bit_length-2)]) + 2^(bit_length-2) - 1;
+
+% https://www.mathworks.com/help/matlab/ref/rand.html
+% https://www.mathworks.com/matlabcentral/answers/417783-how-to-generate-a-random-number-of-n-bits-length
+% In general, you can generate N random numbers in the interval (a,b) with the formula r = a + (b-a).*rand(N,1).
+% Generate a 1-by-1 vector of uniformly distributed numbers in the interval (2^bit_length-2,(2^bit_length-2)-1).
+ka = round( sym(2)^(bit_length-2) + (sym(2)^(bit_length-2) + (sym(2)^(bit_length-2) - 1))*rand(1,1) );
+
+% disp("class(ka): " + class(ka)); % --> sym
+disp("Alice choses secret key: " + string(ka));
+
+% when with large numbers
+%   https://www.mathworks.com/matlabcentral/answers/489112-how-to-use-large-numbers
+%   use sym (instead of int or double)
+%   use powermod (instead of mod)
+%   powermod is in the symbolic toolbox.
+
+% 5) Alice sends k1= ka^a(mod p) to Bob.
+% k1= mod(ka^(r(1)),p);
+k1= powermod(ka,r(1),p);
+% disp("class(k1): " + class(k1)); % --> sym
+disp("Alice sends to Bob: " + string(k1));
+
+% 6) Bob sends k2= k1^b(mod p) to Alice.
+% k2= mod(k1^(r(2)),p);
+k2= powermod(k1,r(2),p);
+%disp("class(k2): " + class(k2)); % --> sym
+disp("Bob sends to Alice: " + string(k2));
+
+% 7) Alice sends k3= k2^(a')(mod p) to Bob.
+% k3= mod(k2^inv_r(1),p);
+k3= powermod(k2,inv_r(1),p);
+% disp("class(k3): " + class(k3)); % --> sym
+disp("Alice sends to Bob: " + string(k3));
+
+% 8) Bob computes kb= k3^(b')(mod p).
+% kb is Bob's shared-key. It has to be identical to ka.
+% kb= mod(k3^inv_r(2),p);
+kb= powermod(k3,inv_r(2),p);
+% disp("class(kb): " + class(kb)); % --> sym
+disp("Bob computes secret key: " + string(kb));
+% 9) assert(kb == ka);
+assert(kb == ka);
+disp("Secret keys are identical!");
